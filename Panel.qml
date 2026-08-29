@@ -83,21 +83,39 @@ Panel {
       + "local omarchy_gdk_scale = 1\n"
       + "local omarchy_monitor_scale = \"auto\"\n\n"
       + "hl.env(\"GDK_SCALE\", tostring(omarchy_gdk_scale))\n\n"
-      + "-- Primary Display (Display 1)\n"
-      + "hl.monitor({\n"
-      + "  output = \"" + pMon + "\",\n"
-      + "  mode = \"1920x1080@240\",\n"
-      + "  position = \"0x0\",\n"
-      + "  scale = 1,\n"
-      + "})\n\n"
-      + "-- Secondary Display (Display 2)\n"
-      + "hl.monitor({\n"
-      + "  output = \"" + sMon + "\",\n"
-      + "  mode = \"1920x1080@60\",\n"
-      + "  position = \"" + currentX + "x" + currentY + "\",\n"
-      + "  scale = " + secondaryScale + ",\n"
-      + "})\n\n"
-      + "-- Fallback for other displays\n"
+
+    var hyprCmds = []
+
+    if (displays.length === 0) {
+      luaContent += "-- Primary Display (Display 1)\n"
+        + "hl.monitor({ output = \"" + pMon + "\", mode = \"1920x1080@240\", position = \"0x0\", scale = 1 })\n\n"
+        + "-- Secondary Display (Display 2)\n"
+        + "hl.monitor({ output = \"" + sMon + "\", mode = \"1920x1080@60\", position = \"" + currentX + "x" + currentY + "\", scale = " + secondaryScale + " })\n\n"
+      hyprCmds.push("hyprctl keyword monitor \"" + pMon + ",1920x1080@240,0x0,1\"")
+      hyprCmds.push("hyprctl keyword monitor \"" + sMon + ",1920x1080@60," + currentX + "x" + currentY + "," + secondaryScale + "\"")
+    } else {
+      for (var i = 0; i < displays.length; i++) {
+        var d = displays[i]
+        var isPrimary = d.name === pMon || (!pMon && i === 0)
+        var posX = isPrimary ? 0 : currentX
+        var posY = isPrimary ? 0 : currentY
+        var mScale = isPrimary ? primaryScale : secondaryScale
+        var refresh = isPrimary ? 240 : 60
+        var mMode = (d.width && d.height) ? (d.width + "x" + d.height + "@" + refresh) : "preferred"
+
+        luaContent += "-- Display " + (i + 1) + ": " + d.name + (isPrimary ? " (Primary)" : "") + "\n"
+          + "hl.monitor({\n"
+          + "  output = \"" + d.name + "\",\n"
+          + "  mode = \"" + mMode + "\",\n"
+          + "  position = \"" + posX + "x" + posY + "\",\n"
+          + "  scale = " + mScale + ",\n"
+          + "})\n\n"
+
+        hyprCmds.push("hyprctl keyword monitor \"" + d.name + "," + mMode + "," + posX + "x" + posY + "," + mScale + "\"")
+      }
+    }
+
+    luaContent += "-- Fallback for any other connected displays\n"
       + "hl.monitor({ output = \"\", mode = \"preferred\", position = \"auto\", scale = 1 })\n\n"
       + "-- Workspace & Display Numbering Assignment\n"
       + "hl.config({\n"
@@ -117,8 +135,7 @@ Panel {
 
     var notifyCmd = notify ? " && notify-send -a 'Display Manager' 'Layout Saved' 'Saved (" + currentX + "x" + currentY + ") to ~/.config/hypr/monitors.lua'" : ""
     var script = "cat << 'EOF' > ~/.config/hypr/monitors.lua\n" + luaContent + "EOF\n"
-      + "hyprctl keyword monitor \"" + pMon + ",1920x1080@240,0x0,1\" && "
-      + "hyprctl keyword monitor \"" + sMon + ",1920x1080@60," + currentX + "x" + currentY + "," + secondaryScale + "\""
+      + hyprCmds.join(" && ")
       + notifyCmd
 
     actionProc.command = ["bash", "-c", script]
