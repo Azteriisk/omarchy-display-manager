@@ -173,9 +173,11 @@ Panel {
     applyPositioning(x, y, true)
   }
 
+  property var scalesMap: ({ "DP-1": 1.0, "HDMI-A-1": 1.25 })
   property string scaleTargetMonitor: "HDMI-A-1"
 
   function getMonitorScale(monName) {
+    if (scalesMap && scalesMap[monName] !== undefined) return scalesMap[monName]
     if (monName === primaryMonitor) return primaryScale
     if (monName === secondaryMonitor) return secondaryScale
     for (var i = 0; i < displays.length; i++) {
@@ -188,9 +190,13 @@ Panel {
     var s = parseFloat(scaleVal)
     if (!isFinite(s) || s <= 0) return
 
+    var copy = Object.assign({}, scalesMap)
+    copy[monName] = s
+    scalesMap = copy
+
     if (monName === primaryMonitor) {
       primaryScale = s
-    } else {
+    } else if (monName === secondaryMonitor) {
       secondaryScale = s
     }
 
@@ -295,22 +301,27 @@ Panel {
       onStreamFinished: {
         try {
           var mons = JSON.parse(text || "[]")
+          var updatedScales = Object.assign({}, root.scalesMap)
           for (var i = 0; i < mons.length; i++) {
             var m = mons[i]
+            if (updatedScales[m.name] === undefined && m.scale) {
+              updatedScales[m.name] = m.scale
+            }
             if (m.name === root.primaryMonitor || (!root.primaryMonitor && i === 0)) {
               root.primaryWidth = m.width
               root.primaryHeight = m.height
-              root.primaryScale = m.scale || 1.0
+              if (!root.hasUserPosition) root.primaryScale = m.scale || 1.0
             } else if (m.name === root.secondaryMonitor || (!root.secondaryMonitor && i === 1)) {
               root.secondaryWidth = m.width
               root.secondaryHeight = m.height
-              root.secondaryScale = m.scale || 1.25
+              if (!root.hasUserPosition) root.secondaryScale = m.scale || 1.25
               if (!root.isDragging && !root.hasUserPosition) {
                 root.currentX = m.x
                 root.currentY = m.y
               }
             }
           }
+          root.scalesMap = updatedScales
         } catch (e) {}
       }
     }
