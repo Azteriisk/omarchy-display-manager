@@ -88,18 +88,16 @@ Panel {
 
     if (displays.length === 0) {
       luaContent += "-- Primary Display (Display 1)\n"
-        + "hl.monitor({ output = \"" + pMon + "\", mode = \"1920x1080@240\", position = \"0x0\", scale = 1 })\n\n"
+        + "hl.monitor({ output = \"" + pMon + "\", mode = \"1920x1080@240\", position = \"0x0\", scale = " + primaryScale + " })\n\n"
         + "-- Secondary Display (Display 2)\n"
         + "hl.monitor({ output = \"" + sMon + "\", mode = \"1920x1080@60\", position = \"" + currentX + "x" + currentY + "\", scale = " + secondaryScale + " })\n\n"
-      hyprCmds.push("hyprctl keyword monitor \"" + pMon + ",1920x1080@240,0x0,1\"")
-      hyprCmds.push("hyprctl keyword monitor \"" + sMon + ",1920x1080@60," + currentX + "x" + currentY + "," + secondaryScale + "\"")
     } else {
       for (var i = 0; i < displays.length; i++) {
         var d = displays[i]
         var isPrimary = (d.name === "DP-1") || (d.name === pMon)
         var posX = isPrimary ? 0 : currentX
         var posY = isPrimary ? 0 : currentY
-        var mScale = isPrimary ? 1.0 : (d.scale || 1.5)
+        var mScale = isPrimary ? root.primaryScale : root.secondaryScale
         var refresh = isPrimary ? 240 : 60
         var mMode = (d.width && d.height) ? (d.width + "x" + d.height + "@" + refresh) : "preferred"
 
@@ -275,6 +273,7 @@ Panel {
   onOpenedChanged: {
     if (opened) {
       root.hasUserPosition = false
+      if (root.focusedMonitor) root.scaleTargetMonitor = root.focusedMonitor
       refresh()
     }
   }
@@ -305,7 +304,7 @@ Panel {
             } else if (m.name === root.secondaryMonitor || (!root.secondaryMonitor && i === 1)) {
               root.secondaryWidth = m.width
               root.secondaryHeight = m.height
-              root.secondaryScale = m.scale || 1.5
+              root.secondaryScale = m.scale || 1.25
               if (!root.isDragging && !root.hasUserPosition) {
                 root.currentX = m.x
                 root.currentY = m.y
@@ -332,6 +331,7 @@ Panel {
         root.internalEnabled = String(lines[3] || "").trim() !== ""
         root.mirrorEnabled = String(lines[4] || "").trim() === root.externalMonitor && root.externalMonitor !== ""
         root.focusedMonitor = String(lines[5] || "").trim()
+        if (root.focusedMonitor) root.scaleTargetMonitor = root.focusedMonitor
         root.monitorScale = Model.normalizeScale(String(lines[6] || "").trim())
         var parsed = Model.parseDisplays(String(lines[7] || "[]").trim())
         root.displays = parsed.displays
