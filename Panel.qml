@@ -175,6 +175,30 @@ Panel {
     applyPositioning(x, y, true)
   }
 
+  property string scaleTargetMonitor: "HDMI-A-1"
+
+  function getMonitorScale(monName) {
+    if (monName === primaryMonitor) return primaryScale
+    if (monName === secondaryMonitor) return secondaryScale
+    for (var i = 0; i < displays.length; i++) {
+      if (displays[i].name === monName) return displays[i].scale || 1.0
+    }
+    return 1.0
+  }
+
+  function setScaleForTarget(monName, scaleVal) {
+    var s = parseFloat(scaleVal)
+    if (!isFinite(s) || s <= 0) return
+
+    if (monName === primaryMonitor) {
+      primaryScale = s
+    } else {
+      secondaryScale = s
+    }
+
+    applyPositioning(currentX, currentY, false)
+  }
+
   function setBrightness(value) {
     var percent = Model.clampBrightness(value)
     root.brightnessPercent = percent
@@ -201,11 +225,6 @@ Panel {
   function setTextSize(px) {
     textScaleProc.command = ["omarchy-display-text-size", String(px)]
     if (!textScaleProc.running) textScaleProc.running = true
-  }
-
-  function setScale(scale) {
-    actionProc.command = ["bash", "-c", "omarchy-hyprland-monitor-scaling " + scale]
-    if (!actionProc.running) actionProc.running = true
   }
 
   function toggleDisplay(name, enabled) {
@@ -748,31 +767,50 @@ Panel {
 
           Column {
             width: parent.width
-            spacing: Style.space(10)
+            spacing: Style.space(8)
 
             PanelSectionHeader {
-              text: "SCALE (Focused: " + (root.focusedMonitor || "DP-1") + ")"
+              text: "DISPLAY SCALE"
               foreground: root.bar.foreground
               fontFamily: root.bar.fontFamily
+            }
+
+            // Monitor Selector for Scale
+            Row {
+              width: parent.width
+              spacing: Style.space(6)
+              visible: root.displays.length > 1
+
+              Repeater {
+                model: root.displays
+                Button {
+                  required property var modelData
+                  text: modelData.name + (modelData.name === "DP-1" ? " [1: Main]" : " [2: Bottom]")
+                  width: (parent.width - (root.displays.length - 1) * Style.space(6)) / root.displays.length
+                  fontSize: Style.font.caption
+                  foreground: root.bar.foreground
+                  fontFamily: root.bar.fontFamily
+                  active: root.scaleTargetMonitor === modelData.name
+                  bordered: true
+                  onClicked: { root.scaleTargetMonitor = modelData.name }
+                }
+              }
             }
 
             Grid {
               id: scaleRow
               width: parent.width
-              columns: root.scaleValues.length
+              columns: root.scalePresets.length
               spacing: Style.spacing.xs
 
-              readonly property real cellWidth: root.scaleValues.length > 0
-                ? (width - spacing * (columns - 1)) / columns
-                : 0
+              readonly property real cellWidth: (width - spacing * (columns - 1)) / columns
 
               Repeater {
-                model: root.scaleValues
+                model: root.scalePresets
                 Button {
                   required property string modelData
-                  required property int index
 
-                  text: root.effectiveScale(modelData) + "x"
+                  text: modelData + "x"
                   fontSize: Style.font.caption
                   foreground: root.bar.foreground
                   fontFamily: root.bar.fontFamily
@@ -780,8 +818,8 @@ Panel {
                   verticalPadding: Style.spacing.controlPaddingY
                   bordered: true
                   width: scaleRow.cellWidth
-                  active: root.activeScaleIndex() === index
-                  onClicked: root.setScale(modelData)
+                  active: Math.abs(root.getMonitorScale(root.scaleTargetMonitor) - parseFloat(modelData)) < 0.05
+                  onClicked: root.setScaleForTarget(root.scaleTargetMonitor, modelData)
                 }
               }
             }
