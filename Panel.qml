@@ -129,33 +129,7 @@ Panel {
     applyPositioning(currentX, currentY, true)
   }
 
-  function swapDisplayNumbers() {
-    var tempMon = primaryMonitor
-    primaryMonitor = secondaryMonitor
-    secondaryMonitor = tempMon
 
-    var tempW = primaryWidth; primaryWidth = secondaryWidth; secondaryWidth = tempW
-    var tempH = primaryHeight; primaryHeight = secondaryHeight; secondaryHeight = tempH
-    var tempS = primaryScale; primaryScale = secondaryScale; secondaryScale = tempS
-
-    // Invert position
-    currentX = -currentX
-    currentY = -currentY
-    applyPositioning(currentX, currentY, false)
-
-    // Actively migrate active workspaces between physical monitors
-    var pMon = primaryMonitor
-    var sMon = secondaryMonitor
-    var migrateScript = "hyprctl dispatch 'hl.dsp.focus({ workspace = \"1\" })' && "
-      + "hyprctl dispatch 'hl.dsp.workspace.move({ monitor = \"" + pMon + "\" })' && "
-      + "hyprctl dispatch 'hl.dsp.focus({ workspace = \"2\" })' && "
-      + "hyprctl dispatch 'hl.dsp.workspace.move({ monitor = \"" + sMon + "\" })' && "
-      + "hyprctl dispatch 'hl.dsp.focus({ monitor = \"" + pMon + "\" })' && "
-      + "hyprctl dispatch 'hl.dsp.focus({ workspace = \"1\" })'"
-
-    actionProc.command = ["bash", "-c", migrateScript]
-    if (!actionProc.running) actionProc.running = true
-  }
 
   function snapToPreset(preset) {
     var x = 0
@@ -687,31 +661,16 @@ Panel {
             }
           }
 
-          // Swap Roles & Save Actions
-          Row {
+          // Save Layout Action
+          Button {
+            text: "💾 Save Layout to monitors.lua"
             width: parent.width
-            spacing: Style.space(6)
-
-            Button {
-              text: "⇄ Swap #1 / #2 Roles"
-              width: (parent.width - Style.space(6)) / 2
-              fontSize: Style.font.caption
-              foreground: root.bar.foreground
-              fontFamily: root.bar.fontFamily
-              bordered: true
-              onClicked: root.swapDisplayNumbers()
-            }
-
-            Button {
-              text: "💾 Save to monitors.lua"
-              width: (parent.width - Style.space(6)) / 2
-              fontSize: Style.font.caption
-              foreground: root.bar.foreground
-              fontFamily: root.bar.fontFamily
-              active: true
-              bordered: true
-              onClicked: root.savePositioningToConfig()
-            }
+            fontSize: Style.font.caption
+            foreground: root.bar.foreground
+            fontFamily: root.bar.fontFamily
+            active: true
+            bordered: true
+            onClicked: root.savePositioningToConfig()
           }
 
           // ---------- Brightness ----------
