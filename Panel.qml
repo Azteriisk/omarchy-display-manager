@@ -96,10 +96,10 @@ Panel {
     } else {
       for (var i = 0; i < displays.length; i++) {
         var d = displays[i]
-        var isPrimary = d.name === pMon || (!pMon && i === 0)
+        var isPrimary = (d.name === "DP-1") || (d.name === pMon)
         var posX = isPrimary ? 0 : currentX
         var posY = isPrimary ? 0 : currentY
-        var mScale = isPrimary ? primaryScale : secondaryScale
+        var mScale = isPrimary ? 1.0 : (d.scale || 1.5)
         var refresh = isPrimary ? 240 : 60
         var mMode = (d.width && d.height) ? (d.width + "x" + d.height + "@" + refresh) : "preferred"
 
@@ -110,8 +110,6 @@ Panel {
           + "  position = \"" + posX + "x" + posY + "\",\n"
           + "  scale = " + mScale + ",\n"
           + "})\n\n"
-
-        hyprCmds.push("hyprctl keyword monitor \"" + d.name + "," + mMode + "," + posX + "x" + posY + "," + mScale + "\"")
       }
     }
 
@@ -120,22 +118,22 @@ Panel {
       + "-- Workspace & Display Numbering Assignment\n"
       + "hl.config({\n"
       + "  workspace = {\n"
-      + "    \"1, monitor:" + pMon + ", default:true\",\n"
-      + "    \"2, monitor:" + sMon + ", default:true\",\n"
-      + "    \"3, monitor:" + pMon + "\",\n"
-      + "    \"4, monitor:" + sMon + "\",\n"
-      + "    \"5, monitor:" + pMon + "\",\n"
-      + "    \"6, monitor:" + sMon + "\",\n"
-      + "    \"7, monitor:" + pMon + "\",\n"
-      + "    \"8, monitor:" + sMon + "\",\n"
-      + "    \"9, monitor:" + pMon + "\",\n"
-      + "    \"10, monitor:" + sMon + "\",\n"
+      + "    \"1, monitor:DP-1, default:true\",\n"
+      + "    \"2, monitor:HDMI-A-1, default:true\",\n"
+      + "    \"3, monitor:DP-1\",\n"
+      + "    \"4, monitor:HDMI-A-1\",\n"
+      + "    \"5, monitor:DP-1\",\n"
+      + "    \"6, monitor:HDMI-A-1\",\n"
+      + "    \"7, monitor:DP-1\",\n"
+      + "    \"8, monitor:HDMI-A-1\",\n"
+      + "    \"9, monitor:DP-1\",\n"
+      + "    \"10, monitor:HDMI-A-1\",\n"
       + "  },\n"
       + "})\n"
 
     var notifyCmd = notify ? " && notify-send -a 'Display Manager' 'Layout Saved' 'Saved (" + currentX + "x" + currentY + ") to ~/.config/hypr/monitors.lua'" : ""
     var script = "cat << 'EOF' > ~/.config/hypr/monitors.lua\n" + luaContent + "EOF\n"
-      + hyprCmds.join(" && ")
+      + "hyprctl reload"
       + notifyCmd
 
     actionProc.command = ["bash", "-c", script]
