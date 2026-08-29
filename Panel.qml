@@ -40,9 +40,10 @@ Panel {
   property int currentX: 200
   property int currentY: 1080
   property bool isDragging: false
+  property bool hasUserPosition: false
 
   // Canvas visual scaling ratio (pixels in canvas per workspace pixel)
-  readonly property real canvasRatio: 0.052
+  readonly property real canvasRatio: 0.050
 
   readonly property var scalePresets: ["1", "1.25", "1.5", "1.6", "2", "3", "4"]
   readonly property var scaleValues: {
@@ -68,8 +69,6 @@ Panel {
   readonly property int primaryEffH: Math.round(primaryHeight / primaryScale)
   readonly property int secondaryEffW: Math.round(secondaryWidth / secondaryScale)
   readonly property int secondaryEffH: Math.round(secondaryHeight / secondaryScale)
-
-  property bool hasUserPosition: false
 
   function applyPositioning(newX, newY, notify) {
     hasUserPosition = true
@@ -98,7 +97,7 @@ Panel {
       + "  position = \"" + currentX + "x" + currentY + "\",\n"
       + "  scale = " + secondaryScale + ",\n"
       + "})\n\n"
-      + "-- Fallback\n"
+      + "-- Fallback for other displays\n"
       + "hl.monitor({ output = \"\", mode = \"preferred\", position = \"auto\", scale = 1 })\n\n"
       + "-- Workspace & Display Numbering Assignment\n"
       + "hl.config({\n"
@@ -142,7 +141,20 @@ Panel {
     // Invert position
     currentX = -currentX
     currentY = -currentY
-    applyPositioning(currentX, currentY)
+    applyPositioning(currentX, currentY, false)
+
+    // Actively migrate active workspaces between physical monitors
+    var pMon = primaryMonitor
+    var sMon = secondaryMonitor
+    var migrateScript = "hyprctl dispatch 'hl.dsp.focus({ workspace = \"1\" })' && "
+      + "hyprctl dispatch 'hl.dsp.workspace.move({ monitor = \"" + pMon + "\" })' && "
+      + "hyprctl dispatch 'hl.dsp.focus({ workspace = \"2\" })' && "
+      + "hyprctl dispatch 'hl.dsp.workspace.move({ monitor = \"" + sMon + "\" })' && "
+      + "hyprctl dispatch 'hl.dsp.focus({ monitor = \"" + pMon + "\" })' && "
+      + "hyprctl dispatch 'hl.dsp.focus({ workspace = \"1\" })'"
+
+    actionProc.command = ["bash", "-c", migrateScript]
+    if (!actionProc.running) actionProc.running = true
   }
 
   function snapToPreset(preset) {
@@ -171,7 +183,7 @@ Panel {
       y = centerY
     }
 
-    applyPositioning(x, y)
+    applyPositioning(x, y, true)
   }
 
   function setBrightness(value) {
@@ -278,11 +290,11 @@ Panel {
           var mons = JSON.parse(text || "[]")
           for (var i = 0; i < mons.length; i++) {
             var m = mons[i]
-            if (m.name === "DP-1") {
+            if (m.name === root.primaryMonitor || (!root.primaryMonitor && i === 0)) {
               root.primaryWidth = m.width
               root.primaryHeight = m.height
               root.primaryScale = m.scale || 1.0
-            } else if (m.name === "HDMI-A-1") {
+            } else if (m.name === root.secondaryMonitor || (!root.secondaryMonitor && i === 1)) {
               root.secondaryWidth = m.width
               root.secondaryHeight = m.height
               root.secondaryScale = m.scale || 1.5
@@ -490,7 +502,7 @@ Panel {
               id: stage
               anchors.fill: parent
 
-              // Reference Origin for Primary Display (Samsung 240Hz)
+              // Reference Origin for Primary Display
               readonly property real originX: (stage.width - pBox.width) / 2
               readonly property real originY: (stage.height - (pBox.height + sBox.height + 8)) / 2
 
@@ -598,7 +610,7 @@ Panel {
 
                   onReleased: {
                     root.isDragging = false
-                    root.applyPositioning(root.currentX, root.currentY)
+                    root.applyPositioning(root.currentX, root.currentY, false)
                   }
                 }
               }
