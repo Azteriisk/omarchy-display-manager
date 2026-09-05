@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "id": "azterisk.display-manager",
   "name": "Display Manager",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "Azteriisk",
-  "description": "Advanced display controls, visual screen positioning, center offsets, and display renumbering",
+  "description": "Advanced display controls, visual screen positioning, per-monitor rotation, center offsets, and display renumbering",
   "kinds": [
     "bar-widget"
   ],
@@ -13,7 +13,7 @@
   },
   "barWidget": {
     "displayName": "Display Manager",
-    "description": "Visual positioning, offsets, display renumbering, brightness, and scaling controls",
+    "description": "Visual positioning, per-monitor rotation, offsets, display renumbering, brightness, and scaling controls",
     "category": "System",
     "allowMultiple": false
   }

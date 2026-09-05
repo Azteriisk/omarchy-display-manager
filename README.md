@@ -7,6 +7,7 @@ An interactive, visual display manager and positioning extension plugin for Omar
 ## Features
 
 - Interactive Drag and Drop Canvas: Click and freely drag connected displays around in real-time to arrange your multi-monitor layout visually.
+- Per-Monitor Rotation: Rotate displays independently (0°, 90°, 180°, 270°) with instant canvas orientation preview and Hyprland lua config persistence.
 - Magnetic Edge and Center Snapping: Snap displays to exact center alignments or adjacent edges.
 - Display Role and Numbering Switcher: Designate Display 1 (Primary) vs Display 2 (Secondary) and assign workspace bindings (Workspaces 1, 3, 5 on Display 1; Workspaces 2, 4, 6 on Display 2).
 - Automatic Instant Persistence: Automatically writes your exact geometry coordinates to ~/.config/hypr/monitors.lua and updates Hyprland live immediately.

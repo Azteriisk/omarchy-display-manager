@@ -122,6 +122,64 @@ function snapCoordinate(val, target, tolerance) {
 }
 
 /**
+ * Normalize and validate a Hyprland monitor transform value (0..7)
+ */
+function normalizeTransform(transform) {
+  var t = parseInt(transform, 10)
+  if (!isFinite(t) || t < 0 || t > 7) return 0
+  return t
+}
+
+/**
+ * Returns true if the transform swaps width and height (90 or 270 degrees)
+ */
+function isPortraitTransform(transform) {
+  var t = normalizeTransform(transform)
+  return t === 1 || t === 3 || t === 5 || t === 7
+}
+
+/**
+ * Get rotation in degrees for a given transform value
+ */
+function rotationDegrees(transform) {
+  var t = normalizeTransform(transform)
+  var degs = [0, 90, 180, 270, 0, 90, 180, 270]
+  return degs[t] || 0
+}
+
+/**
+ * Human-readable rotation label
+ */
+function rotationName(transform) {
+  var t = normalizeTransform(transform)
+  if (t === 1) return "Portrait (90°)"
+  if (t === 2) return "Inverted (180°)"
+  if (t === 3) return "Portrait (270°)"
+  return "Standard (0°)"
+}
+
+/**
+ * Calculate effective workspace dimensions given mode width/height, scale, and transform
+ */
+function effectiveDimensions(width, height, scale, transform) {
+  var w = Number(width)
+  var h = Number(height)
+  var s = parseFloat(String(scale || "1"))
+  if (!isFinite(w) || w <= 0) w = 1920
+  if (!isFinite(h) || h <= 0) h = 1080
+  if (!isFinite(s) || s <= 0) s = 1.0
+
+  var portrait = isPortraitTransform(transform)
+  var effW = portrait ? Math.round(h / s) : Math.round(w / s)
+  var effH = portrait ? Math.round(w / s) : Math.round(h / s)
+
+  return {
+    width: effW,
+    height: effH
+  }
+}
+
+/**
  * Apply smart edge & center snapping when dragging secondary monitor around primary
  */
 function applySmartSnapping(rawX, rawY, pEffW, pEffH, sEffW, sEffH) {
@@ -164,6 +222,11 @@ if (typeof module !== "undefined") {
     availableScales: availableScales,
     brightnessName: brightnessName,
     parseDisplays: parseDisplays,
+    normalizeTransform: normalizeTransform,
+    isPortraitTransform: isPortraitTransform,
+    rotationDegrees: rotationDegrees,
+    rotationName: rotationName,
+    effectiveDimensions: effectiveDimensions,
     applySmartSnapping: applySmartSnapping
   }
 }

@@ -26,15 +26,17 @@ Panel {
   property int enabledDisplayCount: 0
   property real wheelAccumulator: 0
 
-  // Active Monitors & Geometry State
+  // Active Monitors, Geometry & Rotation State
   property string primaryMonitor: "DP-1"
   property string secondaryMonitor: "HDMI-A-1"
   property int primaryWidth: 1920
   property int primaryHeight: 1080
   property real primaryScale: 1.0
+  property int primaryTransform: 0
   property int secondaryWidth: 1920
   property int secondaryHeight: 1080
   property real secondaryScale: 1.5
+  property int secondaryTransform: 0
 
   // Live Hyprland relative coordinates of secondary display
   property int currentX: 200
@@ -55,6 +57,13 @@ Panel {
     return scalePresets
   }
 
+  readonly property var rotationPresets: [
+    { value: 0, label: "0°", desc: "Standard" },
+    { value: 1, label: "90°", desc: "Portrait" },
+    { value: 2, label: "180°", desc: "Inverted" },
+    { value: 3, label: "270°", desc: "Flipped" }
+  ]
+
   readonly property var textSizeStops: [9, 10, 11, 12, 14, 16, 20]
   property int textSizePreviewIndex: -1
   property bool reflowingText: false
@@ -64,11 +73,20 @@ Panel {
     reflowSettle.restart()
   }
 
-  // Effective dimensions in Hyprland workspace
-  readonly property int primaryEffW: Math.round(primaryWidth / primaryScale)
-  readonly property int primaryEffH: Math.round(primaryHeight / primaryScale)
-  readonly property int secondaryEffW: Math.round(secondaryWidth / secondaryScale)
-  readonly property int secondaryEffH: Math.round(secondaryHeight / secondaryScale)
+  // Effective dimensions in Hyprland workspace taking rotation and scale into account
+  readonly property int primaryEffW: (primaryTransform === 1 || primaryTransform === 3 || primaryTransform === 5 || primaryTransform === 7)
+    ? Math.round(primaryHeight / primaryScale)
+    : Math.round(primaryWidth / primaryScale)
+  readonly property int primaryEffH: (primaryTransform === 1 || primaryTransform === 3 || primaryTransform === 5 || primaryTransform === 7)
+    ? Math.round(primaryWidth / primaryScale)
+    : Math.round(primaryHeight / primaryScale)
+
+  readonly property int secondaryEffW: (secondaryTransform === 1 || secondaryTransform === 3 || secondaryTransform === 5 || secondaryTransform === 7)
+    ? Math.round(secondaryHeight / secondaryScale)
+    : Math.round(secondaryWidth / secondaryScale)
+  readonly property int secondaryEffH: (secondaryTransform === 1 || secondaryTransform === 3 || secondaryTransform === 5 || secondaryTransform === 7)
+    ? Math.round(secondaryWidth / secondaryScale)
+    : Math.round(secondaryHeight / secondaryScale)
 
   function applyPositioning(newX, newY, notify) {
     hasUserPosition = true
@@ -88,16 +106,17 @@ Panel {
 
     if (displays.length === 0) {
       luaContent += "-- Primary Display (Display 1)\n"
-        + "hl.monitor({ output = \"" + pMon + "\", mode = \"1920x1080@240\", position = \"0x0\", scale = " + primaryScale + " })\n\n"
+        + "hl.monitor({ output = \"" + pMon + "\", mode = \"1920x1080@240\", position = \"0x0\", scale = " + primaryScale + ", transform = " + primaryTransform + " })\n\n"
         + "-- Secondary Display (Display 2)\n"
-        + "hl.monitor({ output = \"" + sMon + "\", mode = \"1920x1080@60\", position = \"" + currentX + "x" + currentY + "\", scale = " + secondaryScale + " })\n\n"
+        + "hl.monitor({ output = \"" + sMon + "\", mode = \"1920x1080@60\", position = \"" + currentX + "x" + currentY + "\", scale = " + secondaryScale + ", transform = " + secondaryTransform + " })\n\n"
     } else {
       for (var i = 0; i < displays.length; i++) {
         var d = displays[i]
         var isPrimary = (d.name === "DP-1") || (d.name === pMon)
         var posX = isPrimary ? 0 : currentX
         var posY = isPrimary ? 0 : currentY
-        var mScale = isPrimary ? root.primaryScale : root.secondaryScale
+        var mScale = root.getMonitorScale(d.name)
+        var mTransform = root.getMonitorTransform(d.name)
         var refresh = isPrimary ? 240 : 60
         var mMode = (d.width && d.height) ? (d.width + "x" + d.height + "@" + refresh) : "preferred"
 
@@ -107,6 +126,7 @@ Panel {
           + "  mode = \"" + mMode + "\",\n"
           + "  position = \"" + posX + "x" + posY + "\",\n"
           + "  scale = " + mScale + ",\n"
+          + "  transform = " + mTransform + ",\n"
           + "})\n\n"
       }
     }
@@ -176,6 +196,9 @@ Panel {
   property var scalesMap: ({ "DP-1": 1.0, "HDMI-A-1": 1.25 })
   property string scaleTargetMonitor: "HDMI-A-1"
 
+  property var transformsMap: ({ "DP-1": 0, "HDMI-A-1": 0 })
+  property string rotationTargetMonitor: "HDMI-A-1"
+
   function getMonitorScale(monName) {
     if (scalesMap && scalesMap[monName] !== undefined) return scalesMap[monName]
     if (monName === primaryMonitor) return primaryScale
@@ -198,6 +221,32 @@ Panel {
       primaryScale = s
     } else if (monName === secondaryMonitor) {
       secondaryScale = s
+    }
+
+    applyPositioning(currentX, currentY, false)
+  }
+
+  function getMonitorTransform(monName) {
+    if (transformsMap && transformsMap[monName] !== undefined) return transformsMap[monName]
+    if (monName === primaryMonitor) return primaryTransform
+    if (monName === secondaryMonitor) return secondaryTransform
+    for (var i = 0; i < displays.length; i++) {
+      if (displays[i].name === monName && displays[i].transform !== undefined) return displays[i].transform
+    }
+    return 0
+  }
+
+  function setTransformForTarget(monName, transformVal) {
+    var t = Model.normalizeTransform(transformVal)
+
+    var copy = Object.assign({}, transformsMap)
+    copy[monName] = t
+    transformsMap = copy
+
+    if (monName === primaryMonitor) {
+      primaryTransform = t
+    } else if (monName === secondaryMonitor) {
+      secondaryTransform = t
     }
 
     applyPositioning(currentX, currentY, false)
@@ -279,7 +328,10 @@ Panel {
   onOpenedChanged: {
     if (opened) {
       root.hasUserPosition = false
-      if (root.focusedMonitor) root.scaleTargetMonitor = root.focusedMonitor
+      if (root.focusedMonitor) {
+        root.scaleTargetMonitor = root.focusedMonitor
+        root.rotationTargetMonitor = root.focusedMonitor
+      }
       refresh()
     }
   }
@@ -302,19 +354,33 @@ Panel {
         try {
           var mons = JSON.parse(text || "[]")
           var updatedScales = Object.assign({}, root.scalesMap)
+          var updatedTransforms = Object.assign({}, root.transformsMap)
           for (var i = 0; i < mons.length; i++) {
             var m = mons[i]
             if (updatedScales[m.name] === undefined && m.scale) {
               updatedScales[m.name] = m.scale
             }
+            if (updatedTransforms[m.name] === undefined && m.transform !== undefined) {
+              updatedTransforms[m.name] = m.transform
+            }
+            var isT = (m.transform === 1 || m.transform === 3)
+            var nativeW = (isT && m.width < m.height) ? m.height : m.width
+            var nativeH = (isT && m.width < m.height) ? m.width : m.height
+
             if (m.name === root.primaryMonitor || (!root.primaryMonitor && i === 0)) {
-              root.primaryWidth = m.width
-              root.primaryHeight = m.height
-              if (!root.hasUserPosition) root.primaryScale = m.scale || 1.0
+              root.primaryWidth = nativeW
+              root.primaryHeight = nativeH
+              if (!root.hasUserPosition) {
+                root.primaryScale = m.scale || 1.0
+                root.primaryTransform = m.transform || 0
+              }
             } else if (m.name === root.secondaryMonitor || (!root.secondaryMonitor && i === 1)) {
-              root.secondaryWidth = m.width
-              root.secondaryHeight = m.height
-              if (!root.hasUserPosition) root.secondaryScale = m.scale || 1.25
+              root.secondaryWidth = nativeW
+              root.secondaryHeight = nativeH
+              if (!root.hasUserPosition) {
+                root.secondaryScale = m.scale || 1.25
+                root.secondaryTransform = m.transform || 0
+              }
               if (!root.isDragging && !root.hasUserPosition) {
                 root.currentX = m.x
                 root.currentY = m.y
@@ -322,6 +388,7 @@ Panel {
             }
           }
           root.scalesMap = updatedScales
+          root.transformsMap = updatedTransforms
         } catch (e) {}
       }
     }
@@ -556,6 +623,16 @@ Panel {
                     font.bold: true
                     font.pixelSize: 10
                   }
+
+                  Text {
+                    visible: root.primaryTransform !== 0
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: Model.rotationDegrees(root.primaryTransform) + "°"
+                    color: "#11111b"
+                    font.bold: true
+                    font.pixelSize: 8
+                    opacity: 0.85
+                  }
                 }
               }
 
@@ -592,6 +669,16 @@ Panel {
                     color: "#11111b"
                     font.bold: true
                     font.pixelSize: 9
+                  }
+
+                  Text {
+                    visible: root.secondaryTransform !== 0
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: Model.rotationDegrees(root.secondaryTransform) + "°"
+                    color: "#11111b"
+                    font.bold: true
+                    font.pixelSize: 8
+                    opacity: 0.85
                   }
                 }
 
@@ -831,6 +918,69 @@ Panel {
                   width: scaleRow.cellWidth
                   active: Math.abs(root.getMonitorScale(root.scaleTargetMonitor) - parseFloat(modelData)) < 0.05
                   onClicked: root.setScaleForTarget(root.scaleTargetMonitor, modelData)
+                }
+              }
+            }
+          }
+
+          // ---------- Display Rotation ----------
+          PanelSeparator { foreground: root.bar.foreground }
+
+          Column {
+            width: parent.width
+            spacing: Style.space(8)
+
+            PanelSectionHeader {
+              text: "DISPLAY ROTATION"
+              foreground: root.bar.foreground
+              fontFamily: root.bar.fontFamily
+            }
+
+            // Monitor Selector for Rotation
+            Row {
+              width: parent.width
+              spacing: Style.space(6)
+              visible: root.displays.length > 1
+
+              Repeater {
+                model: root.displays
+                Button {
+                  required property var modelData
+                  text: modelData.name + (modelData.name === "DP-1" ? " [1: Main]" : " [2: Bottom]")
+                  width: (parent.width - (root.displays.length - 1) * Style.space(6)) / root.displays.length
+                  fontSize: Style.font.caption
+                  foreground: root.bar.foreground
+                  fontFamily: root.bar.fontFamily
+                  active: root.rotationTargetMonitor === modelData.name
+                  bordered: true
+                  onClicked: { root.rotationTargetMonitor = modelData.name }
+                }
+              }
+            }
+
+            Grid {
+              id: rotationRow
+              width: parent.width
+              columns: root.rotationPresets.length
+              spacing: Style.spacing.xs
+
+              readonly property real cellWidth: (width - spacing * (columns - 1)) / columns
+
+              Repeater {
+                model: root.rotationPresets
+                Button {
+                  required property var modelData
+
+                  text: modelData.label
+                  fontSize: Style.font.caption
+                  foreground: root.bar.foreground
+                  fontFamily: root.bar.fontFamily
+                  horizontalPadding: Style.spacing.sm
+                  verticalPadding: Style.spacing.controlPaddingY
+                  bordered: true
+                  width: rotationRow.cellWidth
+                  active: root.getMonitorTransform(root.rotationTargetMonitor) === modelData.value
+                  onClicked: root.setTransformForTarget(root.rotationTargetMonitor, modelData.value)
                 }
               }
             }
